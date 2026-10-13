@@ -45,13 +45,13 @@ Program wasit (grader) sudah disediakan dan tidak boleh diubah. Kalian cukup mel
     │   ├── rally_miru/instruction_queue.py
     │   ├── rally_miru/motion.py
     │   ├── rally_miru/node/miru_node.py
-    │   └── test/test_m1_queue.py, test_m4_forward.py, test_m5_turn.py
+    │   └── test/test_queue.py, test_forward.py, test_turn.py
     └── rally_navigator             # node navigator
         ├── README.md               # soal Task 3
         ├── rally_navigator/grid.py
         ├── rally_navigator/route.py
         ├── rally_navigator/node/navigator_node.py
-        └── test/test_n2_find_route.py, test_n3_directions.py, test_n4_instructions.py
+        └── test/test_find_route.py, test_directions.py, test_instructions.py
 ```
 
 Miru hanya mengedit `instruction_queue.py`, `motion.py`, dan `miru_node.py`. Navigator hanya mengedit `route.py` dan `navigator_node.py`. Bagian pada kode yang bertanda `Provided, do not modify` jangan diubah, termasuk seluruh package `rally_wasit` dan semua file tes.

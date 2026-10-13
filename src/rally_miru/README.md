@@ -20,7 +20,7 @@ Instruksi `{id: 1, distance: 3, turn: 0}` dikirim dua kali lewat `ros2 topic pub
 [miru] instruksi 1: maju 3, finis
 ```
 
-Note : Hanya muncul satu kali. Tesnya `test/test_m1_queue.py` (6 tes).
+Note : Hanya muncul satu kali. Tesnya `test/test_queue.py` (6 tes).
 
 ### B. Pose dan Perintah Gerak _(6 Points)_
 
@@ -68,7 +68,7 @@ Dengan GO palsu (`ros2 topic pub -r 5 /race/state rally_interfaces/msg/RaceState
 [miru] instruksi 1 selesai, finis
 ```
 
-Note : Butuh bagian A, B, dan C. Tesnya `test/test_m4_forward.py`
+Note : Butuh bagian A, B, dan C. Tesnya `test/test_forward.py`
 
 ### E. Belok _(8 Points)_
 
@@ -85,7 +85,7 @@ ros2 topic echo --once /turtle1/pose --field theta    -> sekitar 1.57 (setelah b
 ros2 topic echo --once /turtle1/pose --field theta    -> sekitar 0    (setelah belok kanan)
 ```
 
-Note : Tesnya `test/test_m5_turn.py`
+Note : Tesnya `test/test_turn.py`
 
 ### F. Laporan Status _(6 Points)_
 

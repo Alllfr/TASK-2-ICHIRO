@@ -36,10 +36,10 @@ Cari rute terpendek dari start ke finis dengan BFS.
 #### Contoh Output:
 Semua tes lolos:
 ```
-test_n2_find_route.py ......
+test_find_route.py ......
 ```
 
-Note : Kamu cukup mengisi pencariannya, penyusunan rute (`trace_back`) sudah disediakan. Tesnya `test/test_n2_find_route.py` (6 tes).
+Note : Kamu cukup mengisi pencariannya, penyusunan rute (`trace_back`) sudah disediakan.
 
 ### C. Rute Menjadi Arah _(6 Points)_
 
@@ -51,10 +51,8 @@ Ubah rute (daftar kotak) jadi daftar arah per langkah.
 #### Contoh Output:
 Semua tes lolos:
 ```
-test_n3_directions.py .....
+test_directions.py .....
 ```
-
-Note : Tesnya `test/test_n3_directions.py` (5 tes).
 
 ### D. Arah Menjadi Instruksi _(8 Points)_
 
@@ -67,10 +65,8 @@ Gabungkan arah yang lurus berturut-turut jadi instruksi "maju sekian, lalu belok
 #### Contoh Output:
 Semua tes lolos:
 ```
-test_n4_instructions.py .......
+test_instructions.py .......
 ```
-
-Note : Kalau bagian A sampai D sudah jadi, peta contoh di bagian A mencetak `rute 6 kotak, 3 instruksi`. Tesnya `test/test_n4_instructions.py` (7 tes).
 
 ### E. Mengirim Instruksi _(6 Points)_
 
