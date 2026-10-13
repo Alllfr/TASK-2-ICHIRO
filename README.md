@@ -5,7 +5,7 @@
 | ---------- | ------------------------   | Miru               |
 | ---------- | ------------------------   | Navigator          |
 
-# Praktikum ROS2 - Reli Miru
+# Tugas ROS2 - Reli Miru
 
 </div>
 
