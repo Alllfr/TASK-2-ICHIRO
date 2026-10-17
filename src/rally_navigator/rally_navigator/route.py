@@ -121,6 +121,43 @@ def directions_to_instructions(directions):
     instructions.append(Instruction(id=instruction_id, distance=current_distance, turn=Instruction.TURN_NONE))
     return instructions
 
+# TODO: TASK G (Bonus) - Algorithm DFS
+def find_route_dfs(grid):
+    start = grid.start
+    finish = grid.finish
+
+    # Stack menyimpan tuple (cell_saat_ini, path_perjalanan)
+    stack = [(start, [start])]
+    visited = {start}
+
+    # Urutan 4 arah mata angin (EAST, NORTH, WEST, SOUTH)
+    directions = [
+        (1, 0),   # EAST
+        (0, -1),  # NORTH
+        (-1, 0),  # WEST
+        (0, 1)    # SOUTH
+    ]
+
+    while stack:
+        current, path = stack.pop()
+
+        if current == finish:
+            return path
+
+        for dc, dr in directions:
+            next_col = current.col + dc
+            next_row = current.row + dr
+
+            # Cek batas grid dan koordinat batu
+            if 0 <= next_col < grid.width and 0 <= next_row < grid.height:
+                if grid.rocks[next_row * grid.width + next_col] == 0:
+                    neighbor = Cell(next_col, next_row)
+                    if neighbor not in visited:
+                        visited.add(neighbor)
+                        stack.append((neighbor, path + [neighbor]))
+
+    return None
+
 # Provided, do not modify
 def route_to_instructions(route):
     return directions_to_instructions(route_to_directions(route))
