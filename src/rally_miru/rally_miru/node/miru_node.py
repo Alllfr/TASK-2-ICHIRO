@@ -67,16 +67,48 @@ class MiruNode:
         self.target_heading = 0.0
 
         # TODO: TASK A - Subscribe ke INSTRUCTION_TOPIC dengan callback on_instruction.
+        self.instruction_subscription = self.node.create_subscription(
+            Instruction,
+            INSTRUCTION_TOPIC,
+            self.on_instruction,
+            10
+        )
 
         # TODO: TASK B - Buat publisher untuk CMD_VEL_TOPIC dan subscriber untuk POSE_TOPIC dengan callback on_pose.
-        self.cmd_vel_publisher = None
+        self.cmd_vel_publisher = self.node.create_publisher(
+            Twist,
+            CMD_VEL_TOPIC,
+            10
+        )
+        self.pose_subscription = self.node.create_subscription(
+            Pose,
+            POSE_TOPIC,
+            self.on_pose,
+            10
+        )
 
         # TODO: TASK C - Daftarkan parameter SPEED_PARAM dengan on_parameter_change,
         # lalu subscribe ke RACE_STATE_TOPIC dengan callback on_race_state.
+        self.node.declare_parameter(SPEED_PARAM, 1.0)
+        self.node.add_on_set_parameters_callback(self.on_parameter_change)
+        self.race_state_subscription = self.node.create_subscription(
+            RaceState,
+            RACE_STATE_TOPIC,
+            self.on_race_state,
+            10
+        )
 
         # TODO: TASK F - Buat publisher untuk STATUS_TOPIC dan timer yang memanggil
         # publish_status tiap STATUS_PERIOD.
-        self.status_publisher = None
+        self.status_publisher = self.node.create_publisher(
+            DriverStatus,
+            STATUS_TOPIC,
+            10
+        )
+        self.status_timer = self.node.create_timer(
+            STATUS_PERIOD,
+            self.publish_status
+        )
 
         self.timer = self.node.create_timer(UPDATE_PERIOD, self.update)
         self.node.get_logger().info('miru siap')
@@ -86,56 +118,122 @@ class MiruNode:
         # Masukkan instruksi ke self.queue.
         # Jika diterima, tampilkan log 'instruksi N: maju D, <nama belokan>' (lihat TURN_NAMES). Jika
         # diabaikan, cukup log debug.
-        pass
+        instruction = QueuedInstruction(
+            msg.instruction_id,
+            msg.distance,
+            msg.turn
+        )
+
+        if self.queue.add(instruction):
+            turn_name = TURN_NAMES.get(msg.turn, 'belokan tidak dikenal')
+            self.node.get_logger().info(
+                f'instruksi {msg.instruction_id}: maju {msg.distance}, {turn_name}'
+            )
+        else:
+            self.node.get_logger().debug(
+                f'instruksi {msg.instruction_id} diabaikan'
+            )
 
     # TODO: TASK B
     def on_pose(self, msg):
         # Simpan pose terbaru di self.pose.
-        pass
+        self.pose = msg
 
     def publish_velocity(self, linear, angular):
         # Kirim satu Twist: linear.x untuk maju, angular.z untuk berputar.
-        pass
+        msg = Twist()
+        msg.linear.x = float(linear)
+        msg.angular.z = float(angular)
+        self.cmd_vel_publisher.publish(msg)
 
     # TODO: TASK C
     def on_race_state(self, msg):
         # Simpan status lomba terbaru di self.race_state.
-        pass
+        self.race_state = msg.state
 
     def get_speed(self):
         return self.node.get_parameter(SPEED_PARAM).value
 
     def on_parameter_change(self, parameters):
         # Tolak speed di luar MIN_SPEED sampai MAX_SPEED, selain itu terima.
+        for parameter in parameters:
+            if parameter.name == SPEED_PARAM:
+                if not MIN_SPEED <= parameter.value <= MAX_SPEED:
+                    return SetParametersResult(
+                        successful=False,
+                        reason=f'speed harus antara {MIN_SPEED} dan {MAX_SPEED}'
+                    )
+
         return SetParametersResult(successful=True)
 
     # TODO: TASK D
     def start_drive(self, cells):
         # Hitung titik tujuan `cells` kotak di depan posisi RENCANA (planned_x, planned_y),
         # lalu simpan di self.target_x dan self.target_y.
-        pass
+        self.target_x, self.target_y = target_point(
+            self.planned_x,
+            self.planned_y,
+            self.planned_heading,
+            cells
+        )
 
     def drive_step(self):
         # Jika sisa jarak ke target sudah 0 atau negatif, hentikan kura-kura dan return True.
         # Jika belum, maju dengan self.get_speed() dan return False.
-        return True
+        distance = remaining_distance(
+            self.pose.x,
+            self.pose.y,
+            self.planned_heading,
+            self.target_x,
+            self.target_y
+        )
+
+        if distance <= 0:
+            self.publish_velocity(0.0, 0.0)
+            return True
+
+        self.publish_velocity(self.get_speed(), 0.0)
+        return False
 
     # TODO: TASK E
     def start_turn(self, turn):
         # Hitung arah tujuan setelah belok dari planned_heading, lalu simpan di self.target_heading.
-        pass
+        self.target_heading = turn_target(
+            self.planned_heading,
+            turn
+        )
 
     def turn_step(self):
         # Hitung selisih self.target_heading dan self.pose.theta, lalu minta kecepatan putarnya ke turn_rate.
         # Jika sudah pas, hentikan kura-kura dan return True. Jika belum, putar dan return
         # False.
-        return True
+        error = wrap_angle(self.target_heading - self.pose.theta)
+        angular_speed = turn_rate(error)
+
+        if angular_speed == 0.0:
+            self.publish_velocity(0.0, 0.0)
+            return True
+
+        self.publish_velocity(0.0, angular_speed)
+        return False
 
     # TODO: TASK F
     def publish_status(self):
         # Kirim satu DriverStatus berisi state, pose, current_id, done_id, dan jumlah antrean.
         # Jangan kirim jika pose pertama belum datang.
-        pass
+        if self.pose is None:
+            return
+
+        msg = DriverStatus()
+        msg.state = self.state.value
+        msg.x = float(self.pose.x)
+        msg.y = float(self.pose.y)
+        msg.theta = float(self.pose.theta)
+        msg.current_id = self.current_id
+        msg.done_id = self.done_id
+        msg.queued = len(self.queue)
+
+        self.status_publisher.publish(msg)
 
     # Provided, do not modify
     def set_state(self, new_state):
