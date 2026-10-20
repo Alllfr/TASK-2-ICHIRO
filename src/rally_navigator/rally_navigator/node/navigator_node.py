@@ -41,6 +41,8 @@ class NavigatorNode:
         self.node.create_subscription(DriverStatus, STATUS_TOPIC, self.on_status, 10)
 
         # TODO: TASK F - Daftarkan parameter INSTRUCTIONS_AHEAD_PARAM bawaan DEFAULT_INSTRUCTIONS_AHEAD dengan on_parameter_change.
+        self.node.declare_parameter(INSTRUCTIONS_AHEAD_PARAM, DEFAULT_INSTRUCTIONS_AHEAD)
+        self.node.add_on_set_parameters_callback(self.on_parameter_change)
 
         self.node.get_logger().info('navigator siap')
 
@@ -103,4 +105,12 @@ class NavigatorNode:
     # TODO: TASK F
     def on_parameter_change(self, parameters):
         # Tolak instructions_ahead di luar MIN_INSTRUCTIONS_AHEAD sampai MAX_INSTRUCTIONS_AHEAD, selain itu terima.
+        for param in parameters:
+            if param.name == INSTRUCTIONS_AHEAD_PARAM:
+                if not(MIN_INSTRUCTIONS_AHEAD <= param.value <= MAX_INSTRUCTIONS_AHEAD):
+                    return SetParametersResult(
+                        successful = False,
+                        reason = f'Nilai {INSTRUCTIONS_AHEAD_PARAM} harus di antara {MIN_INSTRUCTIONS_AHEAD} dan {MAX_INSTRUCTIONS_AHEAD}'
+                    )
+
         return SetParametersResult(successful=True)
