@@ -1,4 +1,5 @@
 from enum import Enum
+import time
 
 from geometry_msgs.msg import Twist
 from rally_interfaces.msg import DriverStatus, Instruction, RaceState
@@ -119,7 +120,7 @@ class MiruNode:
         # Jika diterima, tampilkan log 'instruksi N: maju D, <nama belokan>' (lihat TURN_NAMES). Jika
         # diabaikan, cukup log debug.
         instruction = QueuedInstruction(
-            msg.instruction_id,
+            msg.id,
             msg.distance,
             msg.turn
         )
@@ -127,11 +128,11 @@ class MiruNode:
         if self.queue.add(instruction):
             turn_name = TURN_NAMES.get(msg.turn, 'belokan tidak dikenal')
             self.node.get_logger().info(
-                f'instruksi {msg.instruction_id}: maju {msg.distance}, {turn_name}'
+                f'instruksi {msg.id}: maju {msg.distance}, {turn_name}'
             )
         else:
             self.node.get_logger().debug(
-                f'instruksi {msg.instruction_id} diabaikan'
+                f'instruksi {msg.id} diabaikan'
             )
 
     # TODO: TASK B
@@ -168,6 +169,7 @@ class MiruNode:
 
     # TODO: TASK D
     def start_drive(self, cells):
+        self.drive_start_time = time.monotonic()
         # Hitung titik tujuan `cells` kotak di depan posisi RENCANA (planned_x, planned_y),
         # lalu simpan di self.target_x dan self.target_y.
         self.target_x, self.target_y = target_point(
@@ -190,6 +192,14 @@ class MiruNode:
 
         if distance <= 0:
             self.publish_velocity(0.0, 0.0)
+            error = ((self.target_x - self.pose.x) ** 2 +
+                     (self.target_y - self.pose.y) ** 2) ** 0.5
+            self.node.get_logger().info(
+                f"STOP_MEASURE target=({self.target_x:.4f},{self.target_y:.4f}) "
+                f"actual=({self.pose.x:.4f},{self.pose.y:.4f}) "
+                f"error={error:.4f}m speed={self.get_speed():.2f}m/s "
+                f"elapsed={time.monotonic() - self.drive_start_time:.3f}s"
+            )
             return True
 
         self.publish_velocity(self.get_speed(), 0.0)
