@@ -2,365 +2,263 @@
 
 |    NRP     |           Nama             | Bagian             |
 | :--------: |       :------------:       | :----------------: |
-| ---------- | ------------------------   | Miru               |
-| ---------- | ------------------------   | Navigator          |
+| 2043261062 |  Alfihra Putri Syahbania   | Miru               |
+| 5054261015 |  Arya Wijaya               | Navigator          |
 
-# Tugas ROS2 - Reli Miru
-
-</div>
-
-### Daftar Soal
-
-- [Task 1 - Persiapan ](#soal-task-1--persiapan)
-
-- [Task 2 - Miru](/src/rally_miru/README.md)
-
-- [Task 3 - Navigator](/src/rally_navigator/README.md)
-
----
-
-# Soal Task 1 : Persiapan
-
-Lomba reli kolam kembali digelar! Kali ini, Miru yang hanya fokus menatap ke depan harus melintasi jalur penuh batu tersembunyi. Karena tidak bisa melihat rintangan di depannya, Miru ditemani oleh seorang Coach sebagai navigator yang memegang peta, mencari jalur terbaik, dan membacakan instruksi (seperti "maju 3, belok kanan"). Miru bertugas mengeksekusi instruksi tersebut sambil terus melaporkan posisinya. Tim yang berhasil mencapai garis finis paling cepat dengan penalti paling sedikit akan keluar sebagai pemenang.
-
-Tugas ini dikerjakan secara berpasangan dengan pembagian peran sebagai berikut:
-- Task 2: Mengimplementasikan program untuk Miru.
-- Task 3: Mengimplementasikan program untuk Navigator.
-
-### Catatan Teknis
-
-Program wasit (grader) sudah disediakan dan tidak boleh diubah. Kalian cukup melengkapi bagian kode yang ditandai dengan komentar TODO: TASK X pada kerangka kode yang telah diberikan.
-
-## Deskripsi Sistem
-
-```
-.
-├── README.md                       # soal Task 1 dan laporan praktikum
-└── src
-    ├── rally_interfaces            # pesan bersama
-    │   └── msg/{Instruction,DriverStatus,RaceMap,RaceState}.msg
-    ├── rally_wasit                 # node wasit
-    ├── rally_miru                  # node miru
-    │   ├── README.md               # soal Task 2
-    │   ├── rally_miru/instruction_queue.py
-    │   ├── rally_miru/motion.py
-    │   ├── rally_miru/node/miru_node.py
-    │   └── test/test_queue.py, test_forward.py, test_turn.py
-    └── rally_navigator             # node navigator
-        ├── README.md               # soal Task 3
-        ├── rally_navigator/grid.py
-        ├── rally_navigator/route.py
-        ├── rally_navigator/node/navigator_node.py
-        └── test/test_find_route.py, test_directions.py, test_instructions.py
-```
-
-Miru hanya mengedit `instruction_queue.py`, `motion.py`, dan `miru_node.py`. Navigator hanya mengedit `route.py` dan `navigator_node.py`. Bagian pada kode yang bertanda `Provided, do not modify` jangan diubah, termasuk seluruh package `rally_wasit` dan semua file tes.
-
-### Aturan Lomba
-
-- **Lintasan:** grid 10 × 10 kotak, tiap kotak 1 m. Pusat kotak (kolom `c`, baris `r`) ada di koordinat turtlesim `(c + 1, r + 1)`. Baris 0 di bawah, kolom 0 di kiri.
-- **Batu:** sekitar 25 persen kotak. Ada satu kotak start di kolom 0 dan satu kotak finis di kolom 9. Lintasan dibuat acak dari parameter `seed` milik wasit, dan selalu ada jalan dengan rute terpendek minimal 12 kotak.
-- **Wasit** menggambar batu (kotak merah bersilang), start (kotak biru), dan finis (kotak hijau) di kanvas turtlesim, lalu memindahkan Miru ke kotak start menghadap timur.
-- **Miru tidak boleh membaca peta** dan **navigator tidak boleh membaca posisi kura-kura langsung**. Kedua node hanya boleh saling tahu lewat instruksi dan laporan. Wasit memeriksa siapa saja yang subscribe, dan mencetak `CURANG` Jika ada yang melanggar.
-- Wasit menunggu Miru menyala, lalu hitung mundur 3 detik, lalu `GO!`. Wasit tidak menunggu navigator, jadi **nyalakan navigator sebelum perintah `GO!`**. Navigator yang menyala terlambat akan menyebabkan Miru sudah maju sendiri, sehingga rute dari kotak start tidak cocok lagi dengan posisinya dan lombanya bisa gagal.
-- Gerakan Miru hanya dua macam: **maju lurus** sekian kotak, dan **belok 90°** di tempat ke kiri atau kanan.
-- **Penalti** (ditambahkan ke waktu):
-
-| Kejadian | Akibat |
-|---|---|
-| Miru bergerak sebelum `GO` | +10 detik |
-| Pusat Miru masuk kotak batu | +5 detik per batu |
-| Miru keluar dari grid | lomba gagal |
-| Belum finis setelah 120 detik | lomba gagal |
-| Pusat Miru masuk kotak finis | waktu berhenti |
-
-### Spesifikasi Bersama
-
-**Instruksi.** Satu `Instruction` berarti: *maju sebanyak `distance` kotak dulu, lalu belok `turn`*. `distance` boleh 0, dan instruksi terakhir memakai `TURN_NONE`. Contoh rute di peta kecil:
-
-```
-maju 3, belok kanan     {id: 1, distance: 3, turn: TURN_RIGHT}
-maju 2, belok kiri      {id: 2, distance: 2, turn: TURN_LEFT}
-maju 4, selesai         {id: 3, distance: 4, turn: TURN_NONE}
-```
-
-Miru memulai lomba menghadap **timur**. Jika langkah pertama rute bukan ke timur, instruksi pertama hanya berisi belokan (`distance: 0`). Putar balik 180° ditulis dua belokan kiri berturut-turut dengan `distance: 0`.
-
-**Arah.** Empat arah berurutan berlawanan jarum jam: timur (+kolom), utara (+baris), barat, selatan. Susunan ini sudah ada di `grid.py` sebagai `DIRECTION_COL` dan `DIRECTION_ROW`.
-
-**Urutan tetangga di BFS** harus timur, utara, barat, selatan, supaya peta yang sama selalu menghasilkan rute yang sama.
-
-**Pengiriman instruksi.**
-
-1. Navigator baru mengirim setelah ada rute, Miru sudah melapor sekali, dan ada yang subscribe topic instruksi. Pesan yang dikirim sebelum itu hilang.
-2. Navigator menjaga `instructions_ahead` instruksi di depan `done_id`. Dengan nilai 2 dan `done_id = 4`, instruksi 5 dan 6 sudah harus terkirim.
-3. Jika antrean Miru kosong, Miru berhenti menunggu (`WAITING_INSTRUCTION`). Jika tidak ada navigator sama sekali, Miru maju lurus ke arah hadapnya.
-4. Miru menjalankan instruksi **berurutan menurut `id`**. Instruksi dengan `id` yang sama atau lebih kecil dari yang sudah diterima diabaikan.
-
-### Antarmuka
-
-| Apa | Nama | Tipe | Pengirim | Penerima |
-|---|---|---|---|---|
-| Peta lintasan | `/race/map` | `rally_interfaces/msg/RaceMap` | wasit | navigator |
-| Status lomba | `/race/state` | `rally_interfaces/msg/RaceState` | wasit | miru |
-| Instruksi| `/navigator/instruction` | `rally_interfaces/msg/Instruction` | navigator | miru |
-| Laporan Miru | `/miru/status` | `rally_interfaces/msg/DriverStatus` | miru | navigator |
-| Posisi kura-kura | `/turtle1/pose` | `turtlesim/msg/Pose` | turtlesim | miru dan wasit |
-| Perintah gerak | `/turtle1/cmd_vel` | `geometry_msgs/msg/Twist` | miru | turtlesim |
-| Kecepatan maju | parameter `speed`, bawaan 1,0 m/s, rentang 0,1 sampai 2,5 | double | operator | miru |
-| Instruksi dikirim lebih dulu | parameter `instructions_ahead`, bawaan 2, rentang 1 sampai 5 | integer | operator | navigator |
-| Seed lintasan | parameter `seed`, bawaan -1 (acak) | integer | operator | wasit |
-| Waktu hitung mundur, batas waktu | parameter `countdown` (3,0 s), `time_limit` (120,0 s) | double | operator | wasit |
-
-`ros2 interface show rally_interfaces/msg/DriverStatus` menampilkan isi tiap pesan lengkap dengan konstantanya.
-
-### Contoh Output Lomba
-
-Dengan `seed:=7`. Angka waktu boleh berbeda beberapa detik. Masing-masing node mencetak keluarannya di terminalnya sendiri.
-
-#### Wasit:
-```
-[wasit] lintasan seed 7: start (0, 1), finis (9, 2), rute terpendek 18 kotak
-[wasit] 3...
-[wasit] 2...
-[wasit] 1...
-[wasit] GO!
-[wasit] finish 27.3 s + penalti 0 s = 27.3 s
-```
-
-#### Miru:
-```
-[miru] instruksi 1: maju 0, belok kiri
-[miru] instruksi 2: maju 2, belok kanan
-[miru] instruksi 3: maju 2, belok kiri
-...
-[miru] instruksi 8: maju 4, finis
-```
-
-#### Navigator:
-```
-[navigator] peta diterima: 10x10, 27 batu, start (0, 1), finis (9, 2)
-[navigator] rute 18 kotak, 8 instruksi
-[navigator] kirim instruksi 1: maju 0, belok kiri
-[navigator] kirim instruksi 2: maju 2, belok kanan
-[navigator] kirim instruksi 3: maju 2, belok kiri
-...
-[navigator] kirim instruksi 8: maju 4, finis
-```
-
-Awalan ROS (`[INFO]` dan timestamp) dihilangkan dengan `export RCUTILS_CONSOLE_OUTPUT_FORMAT='[{name}] {message}'`, yang dijalankan sekali di setiap terminal.
-
-## Soal (_Tasks_)
-
-### A. Setup Workspace _(5 Points)_
-
-Build workspace, jalankan keempat node, lalu buktikan semuanya terhubung.
-
-```bash
-source /opt/ros/jazzy/setup.bash
-colcon build --symlink-install
-source install/setup.bash
-
-export RCUTILS_CONSOLE_OUTPUT_FORMAT='[{name}] {message}'   # di setiap terminal
-
-# terminal 1
-ros2 run turtlesim turtlesim_node
-# terminal 2
-ros2 run rally_wasit wasit --ros-args -p seed:=7
-# terminal 3
-ros2 run rally_navigator navigator
-# terminal 4
-ros2 run rally_miru miru
-```
-
-Dengan `--symlink-install`, perubahan kode Python langsung berlaku tanpa `colcon build` ulang, node cukup dijalankan ulang.
-
-#### Contoh Output:
-```
-[wasit] wasit siap
-[navigator] navigator siap
-[miru] miru siap
-[wasit] menunggu miru...
-```
-
-Kanvas turtlesim terisi batu, start, dan finish, dan `rqt_graph` menampilkan keempat node.
-
-Note : Di kerangka awal, wasit akan terus mencetak `menunggu miru...`, karena lomba baru dimulai setelah Miru memasang publisher laporannya (Task 2). Wasit tidak menunggu navigator untuk memulai permainan. Akibatnya Miru maju lurus ke timur dan lomba tetap dinilai. Jalankan `source install/setup.bash` di setiap terminal baru.
-
-## Berkas Pengumpulan
-
-1. Repositori yang berisi source code dari `rally_miru` dan `rally_navigator` yang sudah dilengkapi.
-2. `README.md` di root dengan laporan yang sudah diisi, beserta folder `screenshots/`.
-3. **Penggunaan AI diperbolehkan**, namun harus dinyatakan dengan jelas untuk apa dan bagian mana yang ditulis menggunakan bantuan AI.
-
-## Tips Umum
-
-- Jalankan wasit dengan `-p seed:=7` supaya lintasannya sama setiap kali, dan coba banyak seed sebelum yakin.
-- Nama topic dan parameter sudah tersedia sebagai konstanta di bagian atas file (`..._TOPIC`, `..._PARAM`). Jadi kalian bisa memanfaatkan konstanta itu.
-- `ros2 node list`, `ros2 topic list`, dan `ros2 param list` memberi tahu apa saja yang sebenarnya berjalan.
-
----
-
-### Laporan Resmi Praktikum
-
-Tulis laporan di template berikut! Tidak perlu terlalu teknis sampai kode atau nama fungsi, cukup jelaskan dengan kalimat sendiri.
-
-Penggunaan AI: (sebutkan bagian mana yang dibantu AI, atau tulis "tidak ada")
-
----
-
-# Task 1 - Persiapan dan Lomba
+# Laporan Pengerjaan Task 2
 
 ## A. Setup Workspace
 
 ### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
-
--
+1. **Menyiapkan lingkungan ROS 2 Jazzy** dengan memuat konfigurasi ROS 2 melalui terminal.
+2. **Membangun workspace** menggunakan `colcon build --symlink-install` untuk mengompilasi paket dan menyiapkan executable.
+3. **Memuat workspace** menggunakan `source install/setup.bash` agar paket `rally_wasit`, `rally_navigator`, dan `rally_miru` dapat dijalankan.
+4. **Mengatur format log terminal** menggunakan variabel `RCUTILS_CONSOLE_OUTPUT_FORMAT` agar setiap pesan menampilkan nama node dan isi log.
+5. **Menjalankan node turtlesim** pada terminal pertama sebagai lingkungan simulasi gerakan Miru.
+6. **Menjalankan node wasit** pada terminal kedua dengan parameter `seed:=7` untuk mengatur konfigurasi lomba.
+7. **Menjalankan node navigator** pada terminal ketiga untuk menerima peta lomba, menentukan rute, dan mengirimkan instruksi gerakan kepada Miru.
+8. **Menjalankan node Miru** pada terminal keempat untuk menerima instruksi dari navigator, menjalankan gerakan pada turtlesim, dan melaporkan statusnya.
+9. **Memverifikasi komunikasi antarnode** dengan memastikan keempat node aktif dan topik komunikasi ROS 2 yang diperlukan tersedia.
 
 ### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
+![Hasil Setup Workspace](assets/setupresult.png)
+![Relasi Node](assets/node.png)
 
-# Task 2 - Miru
+# 1. Paket Rally Miru
+
+Miru adalah pembalap yang menjalankan instruksi dari navigator. Miru menerima instruksi melalui ROS 2, menggerakkan turtle menggunakan turtlesim, dan melaporkan statusnya secara berkala.
+
+Implementasi paket `rally_miru` mencakup pengelolaan antrean instruksi, komunikasi ROS 2, pengaturan kecepatan, gerak maju, belokan, dan laporan status. Task bonus berfokus pada peningkatan akurasi penghentian gerakan.
 
 ## A. Antrean Instruksi
+Implementasi `InstructionQueue` menyimpan instruksi dalam antrean FIFO (*First In, First Out*). Setiap instruksi memiliki `instruction_id`, `distance`, dan `turn`.
+Instruksi hanya diterima apabila ID-nya lebih besar daripada ID terakhir yang diterima. Instruksi dengan ID duplikat atau lebih kecil akan diabaikan.
+Langkah-langkah implementasi:
+1. Membuat class `InstructionQueue` dengan antrean berbasis `deque`.
+2. Mengimplementasikan `add()` untuk menerima instruksi baru dan menolak ID yang tidak memenuhi aturan.
+3. Mengimplementasikan `pop()` untuk mengambil instruksi paling awal.
+4. Mengimplementasikan `__len__()` untuk mendapatkan jumlah instruksi yang masih menunggu.
+5. Menghubungkan subscriber `/navigator/instruction` dengan callback `on_instruction()`.
+6. Menampilkan log informasi untuk instruksi yang diterima dan log debug untuk instruksi yang diabaikan.
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
+Implementasi antrean:
+![Implementasi Instruction Queue](assets/instruction_queue.png)
 
--
-
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
+Pengujian antrean:
+![Pengujian Instruction Queue](assets/test_queue.png)
 
 ## B. Pose dan Perintah Gerak
+Miru menggunakan publisher dan subscriber ROS 2 untuk berkomunikasi dengan turtlesim.
+Langkah-langkah implementasi:
+1. Membuat publisher bertipe `Twist` pada `/turtle1/cmd_vel`.
+2. Membuat subscriber bertipe `Pose` pada `/turtle1/pose`.
+3. Menyimpan pose terbaru melalui callback `on_pose()`.
+4. Mengimplementasikan `publish_velocity()` untuk mengatur `linear.x` sebagai kecepatan maju dan `angular.z` sebagai kecepatan rotasi.
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
+Implementasi perhitungan gerak:
+![Implementasi Motion](assets/motion.png)
 
--
+Pemeriksaan komunikasi dilakukan menggunakan `ros2 node info /miru` untuk memastikan publisher dan subscriber terhubung ke topik yang sesuai.
 
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
+## C. Aba-aba GO dan Parameter Kecepatan
+Miru menyimpan status lomba terbaru melalui subscriber `/race/state`. Gerakan dimulai ketika status lomba menunjukkan `GO`.
+Kecepatan gerak dikendalikan melalui parameter `speed`, dengan batas minimum 0,1 m/s dan maksimum 2,5 m/s.
+Langkah-langkah implementasi:
+1. Mendaftarkan parameter `speed` dengan nilai awal 1,0 m/s.
+2. Mendaftarkan callback `on_parameter_change()` untuk memvalidasi perubahan parameter.
+3. Menolak nilai di luar rentang yang diperbolehkan.
+4. Membuat subscriber `/race/state` dengan callback `on_race_state()`.
+5. Menyimpan status lomba terbaru untuk digunakan oleh state machine.
 
-## C. Aba-aba GO dan Parameter
+Implementasi GO dan parameter:
+![Implementasi GO dan Parameter](assets/go_parameter.png)
+Pengujian GO dan parameter:
+![Pengujian GO dan Parameter](assets/test_go_parameter.png)
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
+Pengujian parameter mencakup nilai yang ditolak, seperti 3,0 dan 0,05, serta nilai batas 2,5 m/s yang diterima.
 
--
+## D. Gerak Maju
+Miru bergerak maju berdasarkan koordinat rencana, yaitu `planned_x`, `planned_y`, dan `planned_heading`.
+Langkah-langkah implementasi:
+1. Menggunakan `target_point()` untuk menghitung koordinat tujuan berdasarkan posisi rencana, arah hadap, dan jumlah kotak.
+2. Menyimpan koordinat tujuan pada `target_x` dan `target_y`.
+3. Menggunakan `remaining_distance()` untuk menghitung sisa jarak pada arah gerak.
+4. Mengirim perintah maju selama sisa jarak masih positif.
+5. Mengirim kecepatan nol ketika sisa jarak mencapai nol atau negatif.
+6. Memperbarui posisi rencana setelah gerakan selesai.
 
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
+Implementasi gerak maju:
+![Implementasi Gerak Maju](assets/drive.png)
+Simulasi gerak maju:
+![Simulasi Gerak Maju](assets/drive_simulation.png)
 
-## D. Maju
+## E. Belokan
+Miru mendukung belokan 90 derajat ke kiri dan ke kanan.
+Langkah-langkah implementasi:
+1. Menggunakan `turn_target()` untuk menentukan arah tujuan.
+2. Menambahkan sudut sebesar π/2 untuk belok kiri.
+3. Mengurangi sudut sebesar π/2 untuk belok kanan.
+4. Menggunakan `wrap_angle()` agar sudut berada dalam rentang −π hingga π.
+5. Menghitung selisih sudut antara heading tujuan dan orientasi turtle aktual.
+6. Menggunakan `turn_rate()` untuk menentukan kecepatan rotasi.
+7. Menghentikan rotasi ketika selisih sudut berada dalam toleransi yang ditentukan.
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
+Implementasi belokan:
+![Implementasi Belokan](assets/turn.png)
 
--
-
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
-
-## E. Belok
-
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
-
--
-
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
+Simulasi belokan:
+![Simulasi Belokan](assets/turn_simulation.png)
 
 ## F. Laporan Status
+Miru melaporkan status kepada navigator melalui `/miru/status` dengan interval 0,05 detik atau sekitar 20 Hz.
+Langkah-langkah implementasi:
+1. Membuat publisher bertipe `DriverStatus` pada `/miru/status`.
+2. Membuat timer dengan interval `STATUS_PERIOD` sebesar 0,05 detik.
+3. Memastikan pose pertama telah diterima sebelum menerbitkan status.
+4. Mengisi pesan dengan state Miru, koordinat `x` dan `y`, orientasi `theta`, `current_id`, `done_id`, dan jumlah antrean.
+5. Menerbitkan pesan menggunakan `self.status_publisher.publish(msg)`.
+Implementasi publisher dan timer:
+![Implementasi Publisher dan Timer Status](assets/status.png)
+Implementasi fungsi laporan status:
+![Implementasi Publish Status](assets/status_topic.png)
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
-
--
-
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
+Verifikasi dilakukan menggunakan `ros2 topic echo /miru/status` dan `ros2 topic hz /miru/status`.
 
 ## G. Bonus: Berhenti Lebih Tepat
+Pengukuran dilakukan pada kecepatan 0,5 m/s, 1,0 m/s, dan 2,5 m/s.
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
+### Hasil Pengujian
 
--
+Tabel berikut membandingkan nilai referensi implementasi lama dengan hasil pengukuran implementasi baru.
 
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan, termasuk tabel hasil ukur.
+| Kecepatan | Galat Lama (m) | Waktu Lama (s) | Galat Baru (m) | Waktu Baru (s) |
+|---|---:|---:|---:|---:|
+| 0,5 m/s | 0,05 | 6,0 | 0,0236 | 6,030 |
+| 1,0 m/s | 0,10 | 3,0 | 0,0381 | 3,019 |
+| 2,5 m/s | 0,25 | 1,2 | 0,1462 | 1,214 |
 
-# Task 3 - Navigator
+Galat dan waktu baru merupakan rata-rata pengukuran pada instruksi 6, 7, dan 8 untuk setiap kecepatan.
 
-## A. Menerima Peta
+### Analisis Hasil
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
+| Kecepatan | Penurunan Galat |
+|---|---:|
+| 0,5 m/s | 52,8% |
+| 1,0 m/s | 61,9% |
+| 2,5 m/s | 41,5% |
 
--
+Hasil pengujian menunjukkan bahwa galat posisi rata-rata implementasi baru lebih kecil daripada nilai referensi implementasi lama pada ketiga kecepatan. Galat rata-rata meningkat seiring bertambahnya kecepatan, sehingga penghentian pada kecepatan tinggi masih memiliki galat yang lebih besar.
 
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
+Waktu baru merupakan rata-rata durasi segmen gerak pada instruksi 6–8, sedangkan waktu lama merupakan nilai referensi yang digunakan untuk perbandingan.
 
-## B. Mencari Rute
+**Screenshot**
+![Proses Pengujian](assets/pengujian.png)
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
+## Kesimpulan Miru
+Paket `rally_miru` mengimplementasikan pengelolaan antrean instruksi, komunikasi ROS 2, pengendalian gerak maju, belokan, pengaturan parameter kecepatan, dan publikasi status. Pengujian bonus menunjukkan bahwa galat posisi rata-rata implementasi baru lebih kecil dibandingkan nilai referensi implementasi lama pada tiga kecepatan yang diuji.
 
--
 
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
+# 2. Paket Rally Navigator
 
-## C. Rute Menjadi Arah
+Paket `rally_navigator` dikembangkan untuk mengolah data peta balap (`RaceMap`), menentukan lintasan navigasi dari titik Start hingga Finish, dan mengirimkan instruksi gerakan secara bertahap kepada Miru (`Instruction`) berdasarkan laporan kondisi terkini (`DriverStatus`).
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
+## A. Ringkasan Implementasi
+| Task | Deskripsi | Status | Modul Utama |
+|---|---|---|---|
+| Task A | Subscriber `/race/map` dengan QoS `TRANSIENT_LOCAL` dan `RELIABLE` | Selesai | `navigator_node.py` |
+| Task B | Algoritma rute terpendek Breadth-First Search (BFS) | Selesai | `route.py` |
+| Task C | Konversi rute ke arah mata angin (EAST, NORTH, WEST, SOUTH) | Selesai | `route.py` |
+| Task D | Konversi arah menjadi instruksi gerakan dan belokan (`Instruction`) | Selesai | `route.py` |
+| Task E | Publisher `/navigator/instruction` dan subscriber `/miru/status` | Selesai | `navigator_node.py` |
+| Task F | Parameter dinamis `instructions_ahead` dengan validasi rentang 1–5 | Selesai | `navigator_node.py` |
+| Task G | Implementasi dan analisis perbandingan algoritma DFS dan BFS | Selesai | `route.py` |
 
--
+## B. Penerimaan Peta
+Navigator menggunakan subscriber `/race/map` untuk menerima data peta balap bertipe `RaceMap`.
+Konfigurasi QoS menggunakan:
+- `durability=TRANSIENT_LOCAL`
+- `reliability=RELIABLE`
 
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
+Konfigurasi tersebut memungkinkan navigator menerima peta yang telah dipublikasikan sebelum node navigator aktif, selama publisher masih menyediakan sampel yang tersimpan sesuai pengaturan QoS.
+Implementasi subscriber peta berada pada `navigator_node.py`.
 
-## D. Arah Menjadi Instruksi
+Pengujian Task A:
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
+![Task A](assets/Task_A.png)
 
--
+## C. Pencarian Rute dengan BFS
+Navigator menggunakan algoritma Breadth-First Search (BFS) untuk mencari lintasan dari titik Start menuju Finish pada peta balap.
+Langkah-langkah implementasi:
+1. Membaca struktur peta dan posisi Start serta Finish.
+2. Mengeksplorasi simpul menggunakan antrean FIFO.
+3. Melacak simpul sebelumnya untuk merekonstruksi rute.
+4. Menghasilkan lintasan dengan jumlah langkah minimum pada grid tanpa bobot.
 
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
+Implementasi pencarian rute berada pada `route.py`.
+Pengujian `test_find_route.py`:
+![Pengujian Find Route](assets/test_find_route.png)
 
-## E. Mengirim Instruksi
+## D. Konversi Rute dan Instruksi Gerakan
+Rute hasil BFS dikonversi menjadi arah mata angin, kemudian menjadi instruksi gerakan yang dapat dijalankan Miru.
+Langkah-langkah implementasi:
+1. Mengonversi langkah pada grid menjadi arah EAST, NORTH, WEST, atau SOUTH.
+2. Membandingkan arah berurutan untuk menentukan kebutuhan belokan.
+3. Menggabungkan gerakan maju dan belokan menjadi pesan `Instruction`.
+4. Menyertakan ID instruksi, jarak gerak, dan jenis belokan pada setiap pesan.
+Implementasi konversi arah dan instruksi berada pada `route.py`.
+Pengujian `test_directions.py`:
+![Pengujian Directions](assets/test_directions.png)
+Pengujian `test_instructions.py`:
+![Pengujian Instructions](assets/test_instructions.png)
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
+## E. Komunikasi dengan Miru
+Navigator mengirimkan instruksi gerakan melalui `/navigator/instruction` dan menerima status Miru melalui `/miru/status`.
+Langkah-langkah implementasi:
+1. Membuat publisher untuk pesan `Instruction`.
+2. Membuat subscriber untuk pesan `DriverStatus`.
+3. Membaca `current_id`, `done_id`, dan jumlah instruksi yang masih menunggu.
+4. Mengatur pengiriman instruksi berdasarkan progres Miru.
+5. Mempertahankan batas pengiriman berdasarkan `done_id + instructions_ahead`.
+Mekanisme tersebut memungkinkan navigator mengirim instruksi secara bertahap sesuai kapasitas antrean yang dikonfigurasi.
 
--
+Pengujian Task E:
 
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
+![Task E](assets/Task_E.png)
+![Task E - Pengujian 1](assets/Task_E1.png)
+![Task E - Pengujian 2](assets/Task_E2.png)
+![Task E - Pengujian 3](assets/Task_E3.png)
 
-## F. Parameter instructions_ahead
+## F. Parameter Dinamis `instructions_ahead`
+Navigator menyediakan parameter `instructions_ahead` untuk mengatur jumlah instruksi yang boleh dikirim ke depan.
+Nilai awal parameter adalah `2`, dengan rentang yang diperbolehkan dari `1` hingga `5`.
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
+Langkah-langkah implementasi:
+1. Mendaftarkan parameter `instructions_ahead`.
+2. Menentukan nilai awal parameter sebesar `2`.
+3. Memvalidasi perubahan parameter melalui callback.
+4. Menerima nilai dalam rentang 1–5.
+5. Menolak nilai di luar rentang yang ditentukan.
 
--
+Pengujian Task F:
+![Task F](assets/Task_F.png)
 
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan.
+## G. Perbandingan Algoritma BFS dan DFS
+BFS dan Depth-First Search (DFS) dibandingkan berdasarkan struktur data, pola eksplorasi, optimalitas rute, dan jumlah langkah yang dihasilkan pada grid 5×5.
+| Kriteria | BFS (Breadth-First Search) | DFS (Depth-First Search) |
+|---|---|---|
+| Struktur Data | Queue (FIFO) | Stack (LIFO) atau rekursi |
+| Pola Eksplorasi | Melebar per tingkat (*layer*) | Menyusuri satu jalur hingga ujung sebelum melakukan *backtracking* |
+| Optimalitas Jalur | Menjamin rute terpendek pada graf tanpa bobot | Tidak menjamin rute terpendek |
+| Panjang Rute pada Grid 5×5 | 5 langkah | 13 langkah |
 
-## G. Bonus: DFS lawan BFS
+BFS dipilih sebagai algoritma utama navigator karena menjamin lintasan dengan jumlah langkah minimum pada graf tanpa bobot. DFS dapat menghasilkan lintasan yang lebih panjang, bergantung pada urutan eksplorasi dan struktur peta.
 
-### Langkah-langkah
-Jelaskan langkah-langkah yang dilakukan.
+Pengujian Task G:
 
--
+![Task G](assets/Task_G.png)
 
-### Screenshot
-Masukkan screenshot hasil eksekusi program atau proses yang relevan, termasuk tabel hasil ukur.
+## Kesimpulan Navigator
+Paket `rally_navigator` mengimplementasikan penerimaan peta, pencarian rute menggunakan BFS, konversi arah menjadi instruksi gerakan, komunikasi dengan Miru, dan pengaturan jumlah instruksi yang dikirim ke depan melalui parameter dinamis. Pengujian unit dan fungsional digunakan untuk memverifikasi pencarian rute, konversi arah, pembentukan instruksi, komunikasi antarnode, validasi parameter, dan perbandingan algoritma.
+
+## Pengguaan AI
+AI digunakan untuk memberikan referensi dalam penyusunan sistem lomba dan validasi readme. Pada sintaks, AI digunakan dalam penyusunan BSF, pada readme, AI membantu menyusun tabel pengujian.
