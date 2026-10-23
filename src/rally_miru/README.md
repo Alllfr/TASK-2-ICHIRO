@@ -1,131 +1,181 @@
-# Task 2 : Miru
+# Task 2: Miru
 
-Miru adalah pembalap yang hanya bisa menjalankan perintah. Ia tidak tahu peta, jadi ia mengandalkan instruksi dari navigator, menggerakkan kura-kura lewat turtlesim, dan terus melapor ke navigator. Aturan lomba, spesifikasi instruksi, dan tabel antarmuka ada di [Task 1](/README.md).
+Miru adalah pembalap yang menjalankan instruksi dari navigator. Miru menerima instruksi melalui ROS 2, menggerakkan turtle menggunakan turtlesim, dan melaporkan statusnya secara berkala.
 
-Edit `instruction_queue.py`, `motion.py`, dan `miru_node.py` di `src/rally_miru`.
+Implementasi tugas ini mencakup pengelolaan antrean instruksi, komunikasi ROS 2, pengaturan kecepatan, gerak maju, belokan, dan laporan status. Bagian bonus berfokus pada pengurangan galat penghentian gerakan.
 
-## Soal (_Tasks_)
+## A. Antrean Instruksi
 
-### A. Antrean Instruksi _(6 Points)_
+Implementasi `InstructionQueue` menyimpan instruksi dalam antrean FIFO. Setiap instruksi memiliki `instruction_id`, `distance`, dan `turn`.
 
-Simpan instruksi dari navigator di antrean, dan abaikan instruksi yang `id`-nya sudah pernah diterima.
+Instruksi hanya diterima apabila ID-nya lebih besar daripada ID terakhir yang diterima. Instruksi dengan ID duplikat atau lebih kecil akan diabaikan.
 
-- Subscribe ke topic instruksi, lalu masukkan setiap instruksi ke antrean.
-- Instruksi dengan `id` yang sama atau lebih kecil dari yang sudah diterima diabaikan.
-- Instruksi yang diterima ditampilkan di log, yang diabaikan cukup log debug.
+Langkah-langkah:
 
-#### Contoh Output:
-Instruksi `{id: 1, distance: 3, turn: 0}` dikirim dua kali lewat `ros2 topic pub`:
-```
-[miru] instruksi 1: maju 3, finis
-```
+1. Membuat class `InstructionQueue` dengan antrean berbasis `deque`.
+2. Mengimplementasikan `add()` untuk menerima instruksi baru dan menolak ID yang tidak memenuhi aturan.
+3. Mengimplementasikan `pop()` untuk mengambil instruksi paling awal.
+4. Mengimplementasikan `__len__()` untuk mendapatkan jumlah instruksi yang masih menunggu.
+5. Menghubungkan subscriber `/navigator/instruction` dengan callback `on_instruction()`.
+6. Menampilkan log informasi untuk instruksi yang diterima dan log debug untuk instruksi yang diabaikan.
 
-Note : Hanya muncul satu kali. Tesnya `test/test_queue.py` (6 tes).
+Implementasi antrean:
 
-### B. Pose dan Perintah Gerak _(6 Points)_
+![Implementasi Instruction Queue](assets/instruction_queue.png)
 
-Buat Miru bisa menggerakkan kura-kura dan tahu posisinya.
+Pengujian antrean:
 
-- Buat publisher untuk perintah gerak kura-kura.
-- Buat subscriber untuk posisi kura-kura, dan simpan pose terbaru.
+![Pengujian Instruction Queue](assets/test_queue.png)
 
-#### Contoh Output:
-Keluaran `ros2 node info /miru` memuat:
-```
-Subscribers:
-  /turtle1/pose: turtlesim/msg/Pose
-Publishers:
-  /turtle1/cmd_vel: geometry_msgs/msg/Twist
-```
 
-### C. Aba-aba GO dan Parameter _(6 Points)_
+## B. Pose dan Perintah Gerak
 
-Buat Miru baru berjalan saat aba-aba GO, dan kecepatannya bisa diatur.
+Miru menggunakan publisher dan subscriber ROS 2 untuk berkomunikasi dengan turtlesim.
 
-- Subscribe ke status lomba dan simpan status terbarunya.
-- Daftarkan parameter `speed`. Nilai di luar `MIN_SPEED` sampai `MAX_SPEED` ditolak.
+Langkah-langkah:
 
-#### Contoh Output:
-```
-ros2 param set /miru speed 3.0       -> ditolak
-ros2 param set /miru speed 0.05      -> ditolak
-ros2 param set /miru speed 2.5       -> diterima
-```
+1. Membuat publisher bertipe `Twist` pada `/turtle1/cmd_vel`.
+2. Membuat subscriber bertipe `Pose` pada `/turtle1/pose`.
+3. Menyimpan pose terbaru melalui callback `on_pose()`.
+4. Mengimplementasikan `publish_velocity()` untuk mengatur `linear.x` sebagai kecepatan maju dan `angular.z` sebagai kecepatan rotasi.
 
-Note : Efek GO baru kelihatan setelah bagian D selesai.
+Implementasi perhitungan gerak:
 
-### D. Maju _(8 Points)_
+![Implementasi Motion](assets/motion.png)
 
-Buat Miru maju sekian kotak lalu berhenti pas di tengah kotak tujuan.
+Implementasi komunikasi ROS 2:
 
-- Hitung titik tujuan dari posisi **rencana** (`planned_x`, `planned_y`), bukan dari posisi nyata.
-- Miru terus maju sampai sisa jarak ke tujuan nol atau negatif, lalu berhenti.
-- Kura-kura selalu berhenti sedikit melewati target karena ada jeda antara perintah dan gerakannya, sekitar 0,1 m untuk setiap 1 m/s.
+![Implementasi Miru Node](assets/miru_node.png)
 
-#### Contoh Output:
-Dengan GO palsu (`ros2 topic pub -r 5 /race/state rally_interfaces/msg/RaceState "{state: 2}"`) dan instruksi `{id: 1, distance: 3, turn: 0}`, kura-kura maju sekitar 3 m ke timur lalu berhenti:
-```
-[miru] instruksi 1 selesai, finis
-```
+Pemeriksaan dapat dilakukan melalui `ros2 node info /miru`. Publisher dan subscriber harus muncul pada topik yang sesuai.
 
-Note : Butuh bagian A, B, dan C. Tesnya `test/test_forward.py`
+## C. Aba-aba GO dan Parameter
 
-### E. Belok _(8 Points)_
+Miru menyimpan status lomba terbaru melalui subscriber `/race/state`. Gerakan dimulai ketika status lomba menunjukkan `GO`.
 
-Buat Miru belok kiri atau kanan 90 derajat.
+Kecepatan gerak dikendalikan melalui parameter `speed`, dengan batas `MIN_SPEED` sebesar 0,1 m/s dan `MAX_SPEED` sebesar 2,5 m/s.
 
-- Belok kiri menambah sudut, belok kanan mengurangi.
-- Hasilnya dirapikan dengan `wrap_angle` supaya tetap di rentang -π sampai π.
-- Miru berputar sampai selisih sudut ke arah tujuan cukup kecil, lalu berhenti. Gunakan fungsi `turn_rate` yang sudah disediakan.
+Langkah-langkah:
 
-#### Contoh Output:
-Dengan GO palsu seperti bagian D, instruksi `{id: 1, distance: 0, turn: 1}` lalu `{id: 2, distance: 0, turn: 2}`:
-```
-ros2 topic echo --once /turtle1/pose --field theta    -> sekitar 1.57 (setelah belok kiri)
-ros2 topic echo --once /turtle1/pose --field theta    -> sekitar 0    (setelah belok kanan)
-```
+1. Mendaftarkan parameter `speed` dengan nilai awal 1,0.
+2. Mendaftarkan callback `on_parameter_change()` untuk memvalidasi perubahan parameter.
+3. Menolak nilai di luar rentang yang diperbolehkan.
+4. Membuat subscriber `/race/state` dengan callback `on_race_state()`.
+5. Menyimpan status lomba terbaru untuk digunakan oleh state machine.
 
-Note : Tesnya `test/test_turn.py`
+Implementasi GO dan parameter:
 
-### F. Laporan Status _(6 Points)_
+![Implementasi GO dan Parameter](assets/go_parameter.png)
 
-Buat Miru melapor ke navigator 20 kali per detik.
+Pengujian GO dan parameter:
 
-- Kirim `DriverStatus` berisi state, posisi, arah, `current_id`, `done_id`, dan jumlah antrean.
-- Jangan kirim kalau pose pertama belum datang.
+![Pengujian GO dan Parameter](assets/test_go_parameter.png)
 
-#### Contoh Output:
-```
-ros2 topic hz /miru/status    -> sekitar 20 Hz
-```
+Pengujian parameter perlu mencakup nilai yang ditolak, misalnya 3,0 dan 0,05, serta nilai batas 2,5 yang diterima.
 
-Note : Isi laporan bisa dilihat dengan `ros2 topic echo /miru/status`.
+## D. Maju
 
-### G. Bonus: Berhenti Lebih Tepat _(+10 Points)_
+Miru bergerak maju berdasarkan koordinat rencana, yaitu `planned_x`, `planned_y`, dan `planned_heading`.
 
-Saat berhenti, kura-kura selalu melewati tengah kotak tujuan karena ada jeda antara perintah dan gerakannya. Semakin cepat, semakin jauh lewatnya (sekitar 0,1 m untuk setiap 1 m/s). Kurangi galat itu.
+Langkah-langkah:
 
-- Ubah cara Miru maju di bagian D supaya berhenti lebih dekat ke tengah kotak, misalnya melambat saat mendekati target.
-- Ukur sendiri galat berhenti, yaitu selisih posisi akhir kura-kura dengan titik tujuan, untuk kecepatan 0,5, 1,0, dan 2,5 m/s. Ukur sebelum dan sesudah perbaikan, masing-masing untuk satu instruksi maju 3 kotak.
-- Ukur juga waktu tempuh instruksi itu pada setiap percobaan.
-- Hasilnya dibuat tabel kecepatan × (galat, waktu) untuk versi lama dan versi baru.
+1. Menggunakan `target_point()` untuk menghitung koordinat tujuan berdasarkan posisi rencana, arah hadap, dan jumlah kotak.
+2. Menyimpan koordinat tujuan pada `target_x` dan `target_y`.
+3. Menggunakan `remaining_distance()` untuk menghitung sisa jarak pada arah gerak.
+4. Mengirim perintah maju selama sisa jarak masih positif.
+5. Mengirim kecepatan nol ketika sisa jarak mencapai nol atau negatif.
+6. Memperbarui posisi rencana setelah gerakan selesai.
 
-#### Contoh Output:
-Tabel di laporan (angka hanya contoh):
+Implementasi gerak maju:
 
-| Kecepatan | Galat lama | Waktu lama | Galat baru | Waktu baru |
+![Implementasi Gerak Maju](assets/drive.png)
+
+Simulasi gerak maju:
+
+![Simulasi Gerak Maju](assets/drive_simulation.png)
+
+Pengujian perlu memastikan Miru bergerak menuju titik tujuan berdasarkan posisi rencana dan dapat menyelesaikan instruksi dengan benar.
+
+## E. Belok
+
+Miru mendukung belokan 90 derajat ke kiri dan ke kanan.
+
+Langkah-langkah:
+
+1. Menggunakan `turn_target()` untuk menentukan arah tujuan.
+2. Menambahkan sudut sebesar π/2 untuk belok kiri.
+3. Mengurangi sudut sebesar π/2 untuk belok kanan.
+4. Menggunakan `wrap_angle()` agar sudut berada dalam rentang −π hingga π.
+5. Menghitung selisih sudut antara heading tujuan dan orientasi turtle aktual.
+6. Menggunakan `turn_rate()` untuk menentukan kecepatan rotasi.
+7. Menghentikan rotasi ketika selisih sudut berada dalam toleransi yang ditentukan.
+
+Implementasi belokan:
+
+![Implementasi Belokan](assets/turn.png)
+
+Simulasi belokan:
+
+![Simulasi Belokan](assets/turn_simulation.png)
+
+Pengujian perlu mencakup belokan kiri dan kanan serta pemeriksaan orientasi akhir turtle.
+
+## F. Laporan Status
+
+Miru melaporkan status kepada navigator melalui `/miru/status` sebanyak 20 kali per detik.
+
+Langkah-langkah:
+
+1. Membuat publisher bertipe `DriverStatus` pada `/miru/status`.
+2. Membuat timer dengan interval `STATUS_PERIOD` sebesar 0,05 detik.
+3. Memeriksa apakah pose pertama telah diterima.
+4. Mengisi pesan dengan state Miru, koordinat `x` dan `y`, orientasi `theta`, `current_id`, `done_id`, dan jumlah antrean.
+5. Menerbitkan pesan menggunakan `self.status_publisher.publish(msg)`.
+
+Implementasi publisher dan timer:
+
+![Implementasi Publisher dan Timer Status](assets/status.png)
+
+Implementasi fungsi laporan status:
+
+![Implementasi Publish Status](assets/status_topic.png)
+
+Verifikasi dapat dilakukan menggunakan `ros2 topic echo /miru/status` dan `ros2 topic hz /miru/status`. Frekuensi publikasi yang diharapkan adalah sekitar 20 Hz ketika pose tersedia.
+
+## G. Bonus: Berhenti Lebih Tepat
+
+Gerakan turtlesim memiliki jeda antara pengiriman perintah kecepatan dan penghentian gerakan. Akibatnya, turtle dapat melewati titik tujuan.
+
+Untuk mengurangi galat penghentian, fungsi `drive_step()` dimodifikasi agar kecepatan berkurang ketika turtle mendekati target. Pada implementasi ini, kecepatan diturunkan ketika sisa jarak kurang dari 0,5 meter, sementara kondisi penyelesaian instruksi tetap menggunakan sisa jarak nol atau negatif.
+
+Implementasi penghentian:
+
+![Implementasi Precise Stop](assets/precise_stop.png)
+
+Simulasi penghentian:
+
+![Simulasi Precise Stop](assets/precise_stop_simulation.png)
+
+### Metode pengukuran
+
+Lakukan pengukuran untuk instruksi maju tiga kotak dengan kecepatan 0,5 m/s, 1,0 m/s, dan 2,5 m/s. Ulangi setiap pengukuran sebelum dan sesudah modifikasi.
+
+Catat koordinat target, koordinat akhir, dan waktu tempuh setiap percobaan.
+
+Galat posisi dihitung menggunakan:
+
+e = √((x_aktual − x_target)² + (y_aktual − y_target)²)
+
+| Kecepatan | Galat sebelum | Waktu sebelum | Galat sesudah | Waktu sesudah |
 |---|---|---|---|---|
-| 0,5 m/s | 0,05 m | 6,0 s | 0,01 m | 6,8 s |
-| 1,0 m/s | 0,10 m | 3,0 s | 0,02 m | 3,9 s |
-| 2,5 m/s | 0,25 m | 1,2 s | 0,04 m | 2,3 s |
+| 0,5 m/s | Belum diukur | Belum diukur | Belum diukur | Belum diukur |
+| 1,0 m/s | Belum diukur | Belum diukur | Belum diukur | Belum diukur |
+| 2,5 m/s | Belum diukur | Belum diukur | Belum diukur | Belum diukur |
 
-Note : Posisi akhir bisa dibaca dengan `ros2 topic echo --once /turtle1/pose`. Tidak ada tes bawaan untuk bagian ini. Hati-hati, perbaikanmu tidak boleh membuat bagian D yang lama gagal dites.
+Tabel harus diisi berdasarkan hasil eksperimen aktual. Jangan menggunakan angka contoh dari soal sebagai hasil pengukuran.
 
-## Tips
+## Kesimpulan
 
-- Bagian D dan E bisa diuji dengan `pytest` tanpa pasangan, jadi kerjakan fungsi di `motion.py` lebih dulu.
-- `ros2 run rally_miru miru --ros-args --log-level debug` menampilkan perpindahan state Miru. Alurnya ada di komentar di atas kelas `MiruNode`.
-- Miru bergerak 100 kali per detik dari timer `update`, jadi `drive_step` dan `turn_step` harus singkat dan tidak boleh menunggu.
-- Kalau Miru berhenti di tengah lintasan, lihat `ros2 topic echo /miru/status`: `state: 3` berarti antrean kosong dan navigator belum mengirim instruksi berikutnya. Kalau navigator tidak ada sama sekali, Miru maju lurus terus.
-- Kalau Miru melenceng ke kotak lain, hampir selalu karena target dihitung dari posisi nyata, bukan posisi rencana.
-- Kalau Miru berputar ke arah yang salah, periksa tanda sudut: belok kiri menambah sudut (berlawanan jarum jam), belok kanan mengurangi.
+Implementasi Miru menggabungkan pengelolaan antrean, komunikasi ROS 2, pengendalian gerak, belokan, dan laporan status. Perbaikan bonus berupaya mengurangi galat penghentian melalui perlambatan saat mendekati target.
+
+Keberhasilan implementasi harus dikonfirmasi melalui pengujian otomatis dan simulasi. Hasil pengukuran bonus dicatat secara terpisah agar peningkatan akurasi dan perubahan waktu tempuh dapat dibandingkan.

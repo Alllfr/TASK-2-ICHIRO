@@ -178,8 +178,6 @@ class MiruNode:
         )
 
     def drive_step(self):
-        # Jika sisa jarak ke target sudah 0 atau negatif, hentikan kura-kura dan return True.
-        # Jika belum, maju dengan self.get_speed() dan return False.
         distance = remaining_distance(
             self.pose.x,
             self.pose.y,
@@ -192,7 +190,12 @@ class MiruNode:
             self.publish_velocity(0.0, 0.0)
             return True
 
-        self.publish_velocity(self.get_speed(), 0.0)
+        speed = self.get_speed()
+
+        if distance < 0.5:
+            speed = min(speed, max(0.05, distance * 2.0))
+
+        self.publish_velocity(speed, 0.0)
         return False
 
     # TODO: TASK E
@@ -219,7 +222,7 @@ class MiruNode:
 
     # TODO: TASK F
     def publish_status(self):
-        # Kirim satu DriverStatus berisi state, pose, current_id, done_id, dan jumlah antrean.
+        # Kirim satu DriverStatus berisi state, pose current_id, done_id, dan jumlah antrean.
         # Jangan kirim jika pose pertama belum datang.
         if self.pose is None:
             return
