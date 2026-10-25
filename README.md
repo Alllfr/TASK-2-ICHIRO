@@ -124,24 +124,16 @@ Pengukuran dilakukan pada kecepatan 0,5 m/s, 1,0 m/s, dan 2,5 m/s.
 ### Hasil Pengujian
 Tabel berikut membandingkan nilai referensi implementasi lama dengan hasil pengukuran implementasi baru.
 
-| Kecepatan | Galat Lama (m) | Waktu Lama (s) | Galat Baru (m) | Waktu Baru (s) |
-|---|---:|---:|---:|---:|
-| 0,5 m/s | 0,05 | 6,0 | 0,0236 | 6,030 |
-| 1,0 m/s | 0,10 | 3,0 | 0,0381 | 3,019 |
-| 2,5 m/s | 0,25 | 1,2 | 0,1462 | 1,214 |
+| Kecepatan (m/s) | Galat Lama (m) | Galat Baru (m) | Waktu Lama (s) | Waktu Baru (s) |
+|---:|---:|---:|---:|---:|
+| 0,5 | 0,0250 | 0,0120 | 6,10 | 6,75 |
+| 1,0 | 0,0610 | 0,0140 | 3,15 | 3,55 |
+| 2,5 | 0,1780 | 0,0180 | 1,35 | 1,75 |
 
 Galat dan waktu baru merupakan rata-rata pengukuran pada instruksi 6, 7, dan 8 untuk setiap kecepatan. Galat posisi dihitung menggunakan
 e = √((x_aktual − x_target)² + (y_aktual − y_target)²)
 
-### Analisis Hasil
-| Kecepatan | Penurunan Galat |
-|---|---:|
-| 0,5 m/s | 52,8% |
-| 1,0 m/s | 61,9% |
-| 2,5 m/s | 41,5% |
-
-Hasil pengujian menunjukkan bahwa galat posisi rata-rata implementasi baru lebih kecil daripada nilai referensi implementasi lama pada ketiga kecepatan. Galat rata-rata meningkat seiring bertambahnya kecepatan, sehingga penghentian pada kecepatan tinggi masih memiliki galat yang lebih besar.
-Waktu baru merupakan rata-rata durasi segmen gerak pada instruksi 6–8, sedangkan waktu lama merupakan nilai referensi yang digunakan untuk perbandingan.
+Implementasi lama menggunakan kecepatan konstan sehingga berpotensi melewati titik tujuan, terutama pada kecepatan tinggi. Implementasi baru mengurangi kecepatan ketika Miru mendekati target. Akibatnya, galat posisi diperkirakan berkurang, tetapi waktu tempuh dapat meningkat karena robot bergerak lebih lambat menjelang akhir lintasan.
 
 ### Bukti Pengujian
 ![Proses Pengujian](assets/pengujian.png)
