@@ -90,7 +90,8 @@ class NavigatorNode:
             return
 
         # Kirim instruksi mulai dari self.sent_count sampai done_id + DEFAULT_INSTRUCTIONS_AHEAD log tiap pengiriman
-        target_count = self.last_status.done_id + DEFAULT_INSTRUCTIONS_AHEAD
+        instructions_ahead = self.node.get_parameter(INSTRUCTIONS_AHEAD_PARAM).value
+        target_count = self.last_status.done_id + instructions_ahead
 
         while self.sent_count < target_count and self.sent_count < len(self.instructions):
             inst = self.instructions[self.sent_count]
