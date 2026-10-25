@@ -88,6 +88,22 @@ def directions_to_instructions(directions):
         return [Instruction(id=1, distance=0, turn=Instruction.TURN_NONE)]
     
     instructions = []
+
+    # if directions and directions[0] != EAST:
+    #     first_diff = (directions[0] - EAST) % 4
+    
+    #     if first_diff == 2: # Ke Barat (WEST) -> Putar balik (2x Belok Kiri, jarak 0)
+    #         instructions.append(Instruction(id=instruction_id, distance=0, turn=Instruction.TURN_LEFT))
+    #         instruction_id += 1
+    #         instructions.append(Instruction(id=instruction_id, distance=0, turn=Instruction.TURN_LEFT))
+    #         instruction_id += 1
+    #     else: # Ke Utara (1) atau Selatan (3)
+    #         first_turn = Instruction.TURN_LEFT if first_diff == 1 else Instruction.TURN_RIGHT
+    #         instructions.append(Instruction(id=instruction_id, distance=0, turn=first_turn))
+    #         instruction_id += 1
+        
+    current_facing = directions[0]
+
     # Miru selalu mulai dengan mengahadap timur
     current_facing = EAST
     current_distance = 0
