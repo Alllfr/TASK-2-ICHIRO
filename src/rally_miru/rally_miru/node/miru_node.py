@@ -169,7 +169,6 @@ class MiruNode:
 
     # TODO: TASK D
     def start_drive(self, cells):
-        self.drive_start_time = time.monotonic()
         # Hitung titik tujuan `cells` kotak di depan posisi RENCANA (planned_x, planned_y),
         # lalu simpan di self.target_x dan self.target_y.
         self.target_x, self.target_y = target_point(
@@ -179,9 +178,9 @@ class MiruNode:
             cells
         )
 
+        self.drive_start_time = time.monotonic()
+        
     def drive_step(self):
-        # Jika sisa jarak ke target sudah 0 atau negatif, hentikan kura-kura dan return True.
-        # Jika belum, maju dengan self.get_speed() dan return False.
         distance = remaining_distance(
             self.pose.x,
             self.pose.y,
@@ -190,21 +189,31 @@ class MiruNode:
             self.target_y
         )
 
-        if distance <= 0:
+        if distance <= 0.02:
             self.publish_velocity(0.0, 0.0)
-            error = ((self.target_x - self.pose.x) ** 2 +
-                     (self.target_y - self.pose.y) ** 2) ** 0.5
+
+            elapsed = time.monotonic() - self.drive_start_time
+            error = (
+                (self.target_x - self.pose.x) ** 2
+                + (self.target_y - self.pose.y) ** 2
+            ) ** 0.5
+
             self.node.get_logger().info(
-                f"STOP_MEASURE target=({self.target_x:.4f},{self.target_y:.4f}) "
+                f"STOP_MEASURE "
+                f"target=({self.target_x:.4f},{self.target_y:.4f}) "
                 f"actual=({self.pose.x:.4f},{self.pose.y:.4f}) "
-                f"error={error:.4f}m speed={self.get_speed():.2f}m/s "
-                f"elapsed={time.monotonic() - self.drive_start_time:.3f}s"
+                f"error={error:.4f}m "
+                f"speed={self.get_speed():.2f}m/s "
+                f"time={elapsed:.3f}s"
             )
+
             return True
 
-        self.publish_velocity(self.get_speed(), 0.0)
-        return False
+        speed = min(self.get_speed(), distance * 2.0)
+        self.publish_velocity(speed, 0.0)
 
+        return False
+    
     # TODO: TASK E
     def start_turn(self, turn):
         # Hitung arah tujuan setelah belok dari planned_heading, lalu simpan di self.target_heading.
